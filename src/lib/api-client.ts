@@ -174,12 +174,55 @@ class ApiClient {
 			headers['X-Session-Token'] = sessionToken;
 		}
 
-		// Add CSRF token for state-changing requests
-		if (this.csrfTokenInfo && !this.isCSRFTokenExpired()) {
-			headers['X-CSRF-Token'] = this.csrfTokenInfo.token;
+		// Add CSRF token by reading from cookie directly
+		// This ensures we always use the latest token even if backend rotated it
+		const csrfToken = this.getCSRFTokenFromCookie();
+		if (csrfToken) {
+			headers['X-CSRF-Token'] = csrfToken;
 		}
 
 		return headers;
+	}
+
+	/**
+	 * Get CSRF token directly from cookie
+	 */
+	private getCSRFTokenFromCookie(): string | null {
+		// Get the csrf-token cookie value
+		const match = document.cookie.match(/(?:^|;\s*)csrf-token\s*=\s*([^;]+)/);
+		if (!match) {
+			console.log('[CSRF Debug] No csrf-token cookie found');
+			return null;
+		}
+
+		const cookieValue = match[1];
+		console.log('[CSRF Debug] Raw cookie value:', cookieValue.substring(0, 50) + '...');
+
+		try {
+			// Try to URL decode first
+			const decoded = decodeURIComponent(cookieValue);
+			console.log('[CSRF Debug] Decoded value:', decoded.substring(0, 100) + '...');
+
+			// Try to parse as JSON (backend stores {token, timestamp})
+			try {
+				const parsed = JSON.parse(decoded);
+				if (parsed && typeof parsed === 'object' && parsed.token) {
+					console.log('[CSRF Debug] Extracted token:', parsed.token.substring(0, 20) + '...');
+					return parsed.token;
+				}
+			} catch {
+				// Not JSON, return the decoded value directly
+				console.log('[CSRF Debug] Not JSON, returning decoded value');
+				return decoded;
+			}
+		} catch (e) {
+			// Can't decode, return raw value
+			console.log('[CSRF Debug] Decode error, returning raw value:', e);
+			return cookieValue;
+		}
+
+		console.log('[CSRF Debug] No valid token found');
+		return null;
 	}
 
 	/**

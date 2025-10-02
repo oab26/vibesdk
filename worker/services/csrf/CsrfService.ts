@@ -38,12 +38,13 @@ export class CsrfService {
             token,
             timestamp: Date.now()
         };
-        
+
         const cookie = createSecureCookie({
             name: this.COOKIE_NAME,
             value: JSON.stringify(tokenData),
             sameSite: 'Strict',
-            maxAge
+            maxAge,
+            httpOnly: false
         });
         response.headers.append('Set-Cookie', cookie);
     }
@@ -240,7 +241,8 @@ export class CsrfService {
             name: this.COOKIE_NAME,
             value: '',
             sameSite: 'Strict',
-            maxAge: 0
+            maxAge: 0,
+            httpOnly: false
         });
         response.headers.append('Set-Cookie', cookie);
     }

@@ -30,7 +30,7 @@ export default defineConfig({
 		svgr(),
 		cloudflare({
 			configPath: 'wrangler.jsonc',
-			experimental: { remoteBindings: true },
+			experimental: { remoteBindings: false },
 		}), // Add the node polyfills plugin here
 		// nodePolyfills({
 		//     exclude: [
@@ -78,6 +78,29 @@ export default defineConfig({
 
 	server: {
 		allowedHosts: true,
+		proxy: {
+			'/api': {
+				target: 'http://localhost:8787',
+				changeOrigin: true,
+				secure: false,
+				ws: true,
+				configure: (proxy, _options) => {
+					proxy.on('proxyRes', (proxyRes, _req, _res) => {
+						// Forward all cookies from backend to frontend
+						const cookies = proxyRes.headers['set-cookie'];
+						if (cookies) {
+							// Rewrite cookie domain and path for localhost
+							const rewrittenCookies = cookies.map(cookie => {
+								return cookie
+									.replace(/Domain=[^;]+;?/gi, '') // Remove domain
+									.replace(/Secure;?/gi, ''); // Remove Secure flag for localhost
+							});
+							proxyRes.headers['set-cookie'] = rewrittenCookies;
+						}
+					});
+				}
+			}
+		}
 	},
 
 	// Clear cache more aggressively

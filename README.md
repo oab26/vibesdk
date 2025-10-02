@@ -1,27 +1,21 @@
-# 🧡 Cloudflare Vibe SDK
+# 🧡 ColabShip
 
-> **An open source full-stack AI webapp generator** – Deploy your own instance of Cloudflare VibeSDK, an AI vibe coding platform that you can run and customize yourself.
+> **An open source full-stack AI webapp generator** – Deploy your own instance of ColabShip, an AI coding platform that you can run and customize yourself.
 
 <div align="center">
 
 
-## 🚀 Live Demo
+## 🚀 Deploy Your Own
 
-**[build.cloudflare.dev](https://build.cloudflare.dev)**
+**👉 [Get started with the setup guide below](#-local-development)**
 
-*Explore VibeSDK Build before deploying your own stack.*
-
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/vibesdk)
-
-**👆 Click to deploy your own instance!**
-
-*Follow the setup guide below to configure required services*
+*Clone this repository and deploy your own instance of ColabShip*
 
 </div>
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=cloudflare/vibesdk&type=Date)](https://www.star-history.com/#cloudflare/vibesdk&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=oab26/vibesdk&type=Date)](https://www.star-history.com/#oab26/vibesdk&Date)
 
 ---
 

@@ -19,7 +19,7 @@ import { AgentActionKey, AIModels, InferenceMetadata } from './config.types';
 // import { SecretsService } from '../../database';
 import { RateLimitService } from '../../services/rate-limit/rateLimits';
 import { AuthUser } from '../../types/auth-types';
-import { getUserConfigurableSettings } from '../../config';
+import { getUserConfigurableSettings, getGlobalConfigurableSettings } from '../../config';
 import { SecurityError, RateLimitExceededError } from 'shared/types/errors';
 import { executeToolWithDefinition } from '../tools/customTools';
 import { RateLimitType } from 'worker/services/rate-limit/config';
@@ -188,10 +188,10 @@ function optimizeTextContent(content: string): string {
 
 export async function buildGatewayUrl(env: Env, providerOverride?: AIGatewayProviders): Promise<string> {
     // If CLOUDFLARE_AI_GATEWAY_URL is set and is a valid URL, use it directly
-    if (env.CLOUDFLARE_AI_GATEWAY_URL && 
-        env.CLOUDFLARE_AI_GATEWAY_URL !== 'none' && 
+    if (env.CLOUDFLARE_AI_GATEWAY_URL &&
+        env.CLOUDFLARE_AI_GATEWAY_URL !== 'none' &&
         env.CLOUDFLARE_AI_GATEWAY_URL.trim() !== '') {
-        
+
         try {
             const url = new URL(env.CLOUDFLARE_AI_GATEWAY_URL);
             // Validate it's actually an HTTP/HTTPS URL
@@ -206,7 +206,25 @@ export async function buildGatewayUrl(env: Env, providerOverride?: AIGatewayProv
             console.warn(`Invalid CLOUDFLARE_AI_GATEWAY_URL provided: ${env.CLOUDFLARE_AI_GATEWAY_URL}. Falling back to AI bindings.`);
         }
     }
-    
+
+    // If AI Gateway is not configured, use direct provider URLs
+    if (!env.CLOUDFLARE_AI_GATEWAY || env.CLOUDFLARE_AI_GATEWAY.trim() === '') {
+        const directUrls: Record<string, string> = {
+            'google-ai-studio': 'https://generativelanguage.googleapis.com/v1beta/openai/',
+            'openai': 'https://api.openai.com/v1',
+            'anthropic': 'https://api.anthropic.com/v1/',
+            'openrouter': 'https://openrouter.ai/api/v1',
+            'groq': 'https://api.groq.com/openai/v1',
+        };
+
+        if (providerOverride && providerOverride in directUrls) {
+            return directUrls[providerOverride];
+        }
+
+        // Default to OpenAI-compatible endpoint if provider not recognized
+        return 'https://api.openai.com/v1';
+    }
+
     // Build the url via bindings
     const gateway = env.AI.gateway(env.CLOUDFLARE_AI_GATEWAY);
     const baseUrl = providerOverride ? await gateway.getUrl(providerOverride) : `${await gateway.getUrl()}compat`;
@@ -285,10 +303,10 @@ export async function getConfigurationForModel(
         providerForcedOverride = provider as AIGatewayProviders;
     }
 
-    const baseURL = await buildGatewayUrl(env, providerForcedOverride);
-
     // Extract the provider name from model name. Model name is of type `provider/model_name`
     const provider = providerForcedOverride || model.split('/')[0];
+
+    const baseURL = await buildGatewayUrl(env, provider as AIGatewayProviders);
     // Try to find API key of type <PROVIDER>_API_KEY else default to CLOUDFLARE_AI_GATEWAY_TOKEN
     // `env` is an interface of type `Env`
     const apiKey = await getApiKey(provider, env, userId);
@@ -440,7 +458,8 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
             avatarUrl: undefined
         };
 
-        const userConfig = await getUserConfigurableSettings(env, metadata.userId)
+        const globalConfig = await getGlobalConfigurableSettings(env);
+        const userConfig = await getUserConfigurableSettings(env, metadata.userId, globalConfig)
         // Maybe in the future can expand using config object for other stuff like global model configs?
         await RateLimitService.enforceLLMCallsRateLimit(env, userConfig.security.rateLimit, authUser)
 
@@ -449,6 +468,13 @@ export async function infer<OutputSchema extends z.AnyZodObject>({
 
         // Remove [*.] from model name
         modelName = modelName.replace(/\[.*?\]/, '');
+
+        // When using direct provider URLs (not AI Gateway), strip provider prefix from model name
+        // AI Gateway URLs contain 'gateway' in them, direct provider URLs don't
+        if (!baseURL.includes('gateway')) {
+            // Remove provider prefix (e.g., 'google-ai-studio/' -> '')
+            modelName = modelName.split('/').pop() || modelName;
+        }
 
         const client = new OpenAI({ apiKey, baseURL: baseURL, defaultHeaders });
         const schemaObj =
